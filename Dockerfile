@@ -191,12 +191,13 @@ VOLUME ["${ACTIVEMQ_CONF}", "${ACTIVEMQ_DATA}"]
 
 EXPOSE 61616 8161
 
+
 # Install tomcat
 ENV TOMCAT_VERSION 7.0.72
 # Get Tomcat
 RUN wget --quiet --no-cookies https://archive.apache.org/dist/tomcat/tomcat-7/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz -O /tmp/tomcat.tgz && \
 tar xzvf /tmp/tomcat.tgz -C /opt && \
-mv /opt/apache-tomcat-${TOMCAT_VERSION} /opt/tomcat && \
+mv /opt/apache-tomcat-${TOMCAT_VERSION} /opt/tomcat  && \
 rm /tmp/tomcat.tgz && \
 rm -rf /opt/tomcat/webapps/examples && \
 rm -rf /opt/tomcat/webapps/docs && \
@@ -216,6 +217,53 @@ ENV PATH $PATH:$CATALINA_HOME/bin
 VOLUME "/opt/tomcat/webapps"
 
 EXPOSE 8080
+
+
+
+#Install Postgresql
+
+RUN groupadd -r postgres && useradd -r -g postgres postgres
+
+# Add the PostgreSQL PGP key to verify their Debian packages.
+# It should be the same key as https://www.postgresql.org/media/keys/ACCC4CF8.asc
+RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+
+# Add PostgreSQL's repository. It contains the most recent stable release
+#     of PostgreSQL, ``9.3``.
+RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+
+# Install ``python-software-properties``, ``software-properties-common`` and PostgreSQL 9.3
+#  There are some warnings (in red) that show up during the build. You can hide
+#  them by prefixing each apt-get statement with DEBIAN_FRONTEND=noninteractive
+RUN apt-get update &&\
+DEBIAN_FRONTEND=noninteractive apt-get install -y python-software-properties software-properties-common postgresql-9.3 postgresql-client-9.3 postgresql-contrib-9.3
+
+# Add permissions for postgresql
+RUN chown -R postgres:postgres \
+    /etc/postgresql /var/log/postgresql /etc/ssl/private/ssl-cert-snakeoil.key \
+     /var/lib/postgresql /var/run/postgresql \
+&& chmod -R 700 \
+    /etc/postgresql /var/log/postgresql \
+    /var/lib/postgresql /var/run/postgresql \
+&& gpasswd -a postgres ssl-cert \
+&& chown postgres:ssl-cert /etc/ssl/private/ssl-cert-snakeoil.key \
+&& chown postgres:postgres /etc/ssl/private/ssl-cert-snakeoil.key \
+&& chmod  600 /etc/ssl/private/ssl-cert-snakeoil.key
+
+# Adjust PostgreSQL configuration so that remote connections to the
+# database are possible.
+RUN echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/9.3/main/pg_hba.conf
+RUN sed -i -e 's/peer/trust/' /etc/postgresql/9.3/main/pg_hba.conf
+
+# And add ``listen_addresses`` to ``/etc/postgresql/9.3/main/postgresql.conf``
+RUN echo "listen_addresses='*'" >> /etc/postgresql/9.3/main/postgresql.conf
+# Expose the PostgreSQL port
+EXPOSE 5432
+
+# Add VOLUMEs to allow backup of config, logs and databases
+VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
+
+
 
 # Copying files
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf

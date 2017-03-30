@@ -2,6 +2,16 @@
 set -eo pipefail
 shopt -s nullglob
 
+
+#Initialize postgresql
+POSTGRESQL_COMAND="psql"
+/etc/init.d/postgresql start
+psql -U postgres  --command "ALTER USER postgres WITH ENCRYPTED PASSWORD '$POSTGRESQL_ROOT_PASSWORD';"
+psql -U postgres  --command "CREATE DATABASE motechquartz;"
+psql -U postgres   motechquartz < "~/sql/tables_quartz_postgres.sql"
+/etc/init.d/postgresql stop
+
+
 # Initialize MySQL
 MYSQL_COMMAND="mysqld"
 
@@ -131,7 +141,7 @@ if [ ! -d "$DATADIR/mysql" ]; then
 	fi
 
 	# Import data
-	mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_MOTECH_DATABASE" < "~/sql/tables_quartz_mysql.sql"
+	#mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_MOTECH_DATABASE" < "~/sql/tables_quartz_mysql.sql"
 	mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_OPENMRS_DATABASE" < "~/sql/openmrs.sql"
 	mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_OPENMRS_DATABASE" < "~/sql/locations.sql"
 	mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_OPENMRS_DATABASE" < "~/sql/person_attribute_type.sql"
@@ -157,6 +167,7 @@ if [ ! -d "$DATADIR/mysql" ]; then
 fi
 
 # Finished MySQL Initialization
+
 
 # Initialize CouchDB
 
